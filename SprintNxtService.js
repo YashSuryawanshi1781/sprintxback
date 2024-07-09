@@ -43,7 +43,7 @@ class SprintNxtService {
         return JSON.stringify({
             body: {
                 payload: encryptedData,
-                key: this.encryptedAESKeyBase64,
+                key: this.encryptedAESKeyBase64, // Replace with actual value or logic
                 partnerId: partnerId,
                 clientid: clientId
             }
