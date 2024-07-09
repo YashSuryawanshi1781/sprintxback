@@ -4,9 +4,10 @@ const SprintNxtService = require('./SprintNxtService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const sprintNxtService = new SprintNxtService();
 
 app.use(bodyParser.json());
+
+const sprintNxtService = new SprintNxtService();
 
 app.post('/auth/sprintnxt/payout', async (req, res) => {
     const payload = req.body;
@@ -25,20 +26,7 @@ app.post('/auth/sprintnxt/payoutv2', async (req, res) => {
     console.log("Key --->>>>> ", requestBody.key);
 
     try {
-        const response = await axios.post(
-            'https://uatnxtgen.sprintnxt.in/api/v1/payout/PAYOUT',
-            requestBody.body,
-            {
-                headers: {
-                    'accept': 'application/json',
-                    'partnerId': 'NlRJUE5OUk',
-                    'client-id': 'U1BSX05YVF91YXRfOTc3YThmYmJiY2VmNjU4Nw==',
-                    'key': requestBody.key,
-                    'content-type': 'application/hal+json'
-                }
-            }
-        );
-
+        const response = await sprintNxtService.sendEncryptedData(requestBody);
         res.status(response.status).send(response.data);
     } catch (error) {
         console.error(error);
