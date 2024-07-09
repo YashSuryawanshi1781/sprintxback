@@ -13,6 +13,7 @@ app.post('/auth/sprintnxt/payout', async (req, res) => {
     const payload = req.body;
     try {
         const response = await sprintNxtService.encryptAndSendData(JSON.stringify(payload));
+        console.log(payload);
         res.status(200).json(response);
     } catch (error) {
         console.error(error);
