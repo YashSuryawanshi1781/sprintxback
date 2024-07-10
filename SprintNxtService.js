@@ -92,12 +92,14 @@ class SprintNxtService {
 
     async sendEncryptedData(encryptedPayload) {
         const headers = {
-            'accept': 'application/json',
-            'partnerId': partnerId,
+            accept: 'application/json',
+            partnerId: partnerId,
             'client-id': clientId,
-            'key': this.encryptedAESKeyBase64,
+            key: this.encryptedAESKeyBase64,
             'content-type': 'application/hal+json'
         };
+
+        console.log("Request Headers:", headers); // Debugging statement
 
         try {
             const response = await axios.post('https://uatnxtgen.sprintnxt.in/api/v1/payout/PAYOUT', encryptedPayload, { headers });
