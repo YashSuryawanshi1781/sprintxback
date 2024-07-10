@@ -1,11 +1,13 @@
+const express = require('express');
 const axios = require('axios');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
+// Load environment variables
 require('dotenv').config();
 
-const publicKeyPath = process.env.PUBLIC_KEY_PATH;
+const publicKeyPath = process.env.PUBLIC_KEY_PATH || 'keys/public_key.pem'; // Ensure this path is correct
 const partnerId = "NlRJUE5OUk";
 const clientId = "U1BSX05YVF91YXRfOTc3YThmYmJiY2VmNjU4Nw==";
 
@@ -16,14 +18,10 @@ class SprintNxtService {
 
     loadPublicKey() {
         try {
-            const publicKeyPEM = fs.readFileSync(path.resolve(__dirname, publicKeyPath), 'utf-8')
-                .replace('-----BEGIN PUBLIC KEY-----', '')
-                .replace('-----END PUBLIC KEY-----', '')
-                .replace(/\s/g, '');
+            const publicKeyPEM = fs.readFileSync(path.resolve(__dirname, publicKeyPath), 'utf-8');
             return crypto.createPublicKey({
-                key: Buffer.from(publicKeyPEM, 'base64'),
-                format: 'der',
-                type: 'spki'
+                key: publicKeyPEM,
+                format: 'pem',
             });
         } catch (error) {
             console.error("Error loading public key:", error);
@@ -36,14 +34,23 @@ class SprintNxtService {
     }
 
     encryptAESKeyWithRSAPublicKey(aesKey, rsaPublicKey) {
-        return crypto.publicEncrypt(rsaPublicKey, aesKey).toString('base64');
+        try {
+            return crypto.publicEncrypt({
+                key: rsaPublicKey,
+                padding: crypto.constants.RSA_PKCS1_PADDING
+            }, aesKey).toString('base64');
+        } catch (error) {
+            console.error("Error encrypting AES key with RSA public key:", error);
+            throw error;
+        }
     }
 
     encryptPayload(payload, aesKey) {
         try {
-            const cipher = crypto.createCipheriv('aes-256-ecb', aesKey, null);
+            const cipher = crypto.createCipheriv('aes-256-ecb', aesKey, Buffer.alloc(0)); // Use Buffer.alloc(0) for no IV
             let encryptedData = cipher.update(payload, 'utf8', 'base64');
             encryptedData += cipher.final('base64');
+
             return JSON.stringify({
                 body: {
                     payload: encryptedData,
@@ -67,10 +74,9 @@ class SprintNxtService {
 
             console.log("AES Key (Base64 Encoded): " + aesKey.toString('base64'));
             console.log("Encrypted AES Key (Base64 Encoded): " + this.encryptedAESKeyBase64);
-
-            return await this.sendEncryptedData(encryptedPayload);
+            return this.sendEncryptedData(encryptedPayload);
         } catch (error) {
-            console.error("Error encrypting and sending data:", error);
+            console.error("Error in encryptAndSendData:", error);
             throw error;
         }
     }
@@ -87,13 +93,51 @@ class SprintNxtService {
         try {
             const response = await axios.post('https://uatnxtgen.sprintnxt.in/api/v1/payout/PAYOUT', encryptedPayload, { headers });
             console.log("Response Content-Type: " + response.headers['content-type']);
-            console.log("Response Body: " + response.data);
+            console.log("Response Body: ", response.data);
             return response.data;
         } catch (error) {
-            console.error("Error during HTTP request", error);
+            console.error("Error during HTTP request:", error.response ? error.response.data : error.message);
             throw error;
         }
     }
 }
 
-module.exports = SprintNxtService;
+const app = express();
+app.use(express.json());
+
+const sprintNxtService = new SprintNxtService();
+
+app.post('/payout', async (req, res) => {
+    const payload = req.body;
+    try {
+        const response = await sprintNxtService.encryptAndSendData(JSON.stringify(payload));
+        console.log("Payload: " + JSON.stringify(payload, null, 2));
+        res.status(200).json(response);
+    } catch (error) {
+        console.error("Error in /payout route:", error);
+        res.status(400).send("Error: " + error.message);
+    }
+});
+
+app.post('/payoutv2', async (req, res) => {
+    const requestBody = req.body;
+    console.log("Request Body --->>>>> ", JSON.stringify(requestBody.body, null, 2));
+    console.log("Key --->>>>> ", requestBody.key);
+
+    try {
+        const response = await sprintNxtService.sendEncryptedData(requestBody);
+        res.status(response.status).send(response.data);
+    } catch (error) {
+        console.error("Error in /payoutv2 route:", error);
+        if (error.response) {
+            res.status(error.response.status).send(error.response.data);
+        } else {
+            res.status(500).send("Error occurred: " + error.message);
+        }
+    }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
