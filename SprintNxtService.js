@@ -19,6 +19,7 @@ class SprintNxtService {
     loadPublicKey() {
         try {
             const publicKeyPEM = fs.readFileSync(path.resolve(__dirname, publicKeyPath), 'utf-8');
+            console.log("Public Key PEM:", publicKeyPEM); // Debugging statement
             return crypto.createPublicKey({
                 key: publicKeyPEM,
                 format: 'pem',
@@ -30,15 +31,19 @@ class SprintNxtService {
     }
 
     generateAESKey() {
-        return crypto.randomBytes(32); // 256-bit AES key
+        const aesKey = crypto.randomBytes(32); // 256-bit AES key
+        console.log("Generated AES Key:", aesKey.toString('base64')); // Debugging statement
+        return aesKey;
     }
 
     encryptAESKeyWithRSAPublicKey(aesKey, rsaPublicKey) {
         try {
-            return crypto.publicEncrypt({
+            const encryptedAESKey = crypto.publicEncrypt({
                 key: rsaPublicKey,
                 padding: crypto.constants.RSA_PKCS1_PADDING
             }, aesKey).toString('base64');
+            console.log("Encrypted AES Key with RSA Public Key:", encryptedAESKey); // Debugging statement
+            return encryptedAESKey;
         } catch (error) {
             console.error("Error encrypting AES key with RSA public key:", error);
             throw error;
@@ -50,6 +55,8 @@ class SprintNxtService {
             const cipher = crypto.createCipheriv('aes-256-ecb', aesKey, Buffer.alloc(0)); // Use Buffer.alloc(0) for no IV
             let encryptedData = cipher.update(payload, 'utf8', 'base64');
             encryptedData += cipher.final('base64');
+
+            console.log("Encrypted Payload:", encryptedData); // Debugging statement
 
             return JSON.stringify({
                 body: {
@@ -72,8 +79,10 @@ class SprintNxtService {
             this.encryptedAESKeyBase64 = this.encryptAESKeyWithRSAPublicKey(aesKey, publicKey);
             const encryptedPayload = this.encryptPayload(payload, aesKey);
 
-            console.log("AES Key (Base64 Encoded): " + aesKey.toString('base64'));
-            console.log("Encrypted AES Key (Base64 Encoded): " + this.encryptedAESKeyBase64);
+            console.log("AES Key (Base64 Encoded):", aesKey.toString('base64')); // Debugging statement
+            console.log("Encrypted AES Key (Base64 Encoded):", this.encryptedAESKeyBase64); // Debugging statement
+            console.log("Encrypted Payload to be sent:", encryptedPayload); // Debugging statement
+
             return this.sendEncryptedData(encryptedPayload);
         } catch (error) {
             console.error("Error in encryptAndSendData:", error);
@@ -92,8 +101,8 @@ class SprintNxtService {
 
         try {
             const response = await axios.post('https://uatnxtgen.sprintnxt.in/api/v1/payout/PAYOUT', encryptedPayload, { headers });
-            console.log("Response Content-Type: " + response.headers['content-type']);
-            console.log("Response Body: ", response.data);
+            console.log("Response Content-Type:", response.headers['content-type']); // Debugging statement
+            console.log("Response Body:", response.data); // Debugging statement
             return response.data;
         } catch (error) {
             console.error("Error during HTTP request:", error.response ? error.response.data : error.message);
@@ -111,7 +120,7 @@ app.post('/payout', async (req, res) => {
     const payload = req.body;
     try {
         const response = await sprintNxtService.encryptAndSendData(JSON.stringify(payload));
-        console.log("Payload: " + JSON.stringify(payload, null, 2));
+        console.log("Payload:", JSON.stringify(payload, null, 2)); // Debugging statement
         res.status(200).json(response);
     } catch (error) {
         console.error("Error in /payout route:", error);
@@ -121,8 +130,8 @@ app.post('/payout', async (req, res) => {
 
 app.post('/payoutv2', async (req, res) => {
     const requestBody = req.body;
-    console.log("Request Body --->>>>> ", JSON.stringify(requestBody.body, null, 2));
-    console.log("Key --->>>>> ", requestBody.key);
+    console.log("Request Body --->>>>>", JSON.stringify(requestBody.body, null, 2)); // Debugging statement
+    console.log("Key --->>>>>", requestBody.key); // Debugging statement
 
     try {
         const response = await sprintNxtService.sendEncryptedData(requestBody);
